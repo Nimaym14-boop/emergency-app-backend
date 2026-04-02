@@ -8,7 +8,7 @@ const firebaseConfig = {
   projectId: "emergency-app-16163",
   storageBucket: "emergency-app-16163.firebasestorage.app",
   messagingSenderId: "594138423990",
-  appId: "1:594138423990:web:9f4cfb0d5187da80fffc17",
+  appId: "Hidden for security",
   measurementId: "G-RXF3EE7LCH"
 };
 
