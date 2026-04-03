@@ -2,18 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+// Import your secret config file
+import 'package:flutter_app/config.dart'; 
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Use the constants from your ignored config.dart
   await Firebase.initializeApp(
     options: const FirebaseOptions(
-      apiKey: "AIzaSyBmy69cqwvJi9q5I98AvlN_qGgIL91CRNM",
-      authDomain: "emergency-app-16163.firebaseapp.com",
-      projectId: "emergency-app-16163",
-      storageBucket: "emergency-app-16163.firebasestorage.app",
-      messagingSenderId: "594138423990",
-      appId: "1:594138423990:web:9f4cfb0d5187da80fffc17",
-      measurementId: "G-RXF3EE7LCH",
+      apiKey: FirebaseConfig.apiKey,
+      authDomain: FirebaseConfig.authDomain,
+      projectId: FirebaseConfig.projectId,
+      storageBucket: FirebaseConfig.storageBucket,
+      messagingSenderId: FirebaseConfig.messagingSenderId,
+      appId: FirebaseConfig.appId,
+      measurementId: FirebaseConfig.measurementId,
     ),
   );
   runApp(const RapidCrisisApp());
@@ -48,8 +52,10 @@ class AuthGate extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
+        // If not logged in, show Login Screen
         if (!snapshot.hasData) return const LoginScreen();
 
+        // If logged in, check role in Firestore
         return FutureBuilder<DocumentSnapshot>(
           future: FirebaseFirestore.instance.collection('Users').doc(snapshot.data!.uid).get(),
           builder: (context, userSnapshot) {
@@ -91,6 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text.trim(),
       );
 
+      // Person 3's Logic: Set staff to available upon successful login
       final userDoc = await FirebaseFirestore.instance.collection('Users').doc(userCredential.user!.uid).get();
       if (userDoc.exists && userDoc['role'] == 'staff') {
         await FirebaseFirestore.instance.collection('Staff').doc(userCredential.user!.uid).set({
@@ -157,6 +164,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       body: Row(
         children: [
+          // Sidebar: Incident List
           SizedBox(
             width: 380,
             child: StreamBuilder<QuerySnapshot>(
@@ -167,11 +175,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               builder: (context, snapshot) {
                 if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
                 final docs = snapshot.data!.docs;
-                docs.sort((a, b) {
-                   final aTime = (a.data() as Map)['timeSent'] as Timestamp?;
-                   final bTime = (b.data() as Map)['timeSent'] as Timestamp?;
-                   return (bTime ?? Timestamp.now()).compareTo(aTime ?? Timestamp.now());
-                });
 
                 return ListView.builder(
                   itemCount: docs.length,
@@ -192,9 +195,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           const VerticalDivider(width: 1),
+          // Main Panel: Incident Details & Dispatch
           Expanded(
             child: _selectedIncidentId == null
-                ? const Center(child: Text("Select an active incident"))
+                ? const Center(child: Text("Select an active incident from the sidebar"))
                 : IncidentDetails(
                     key: ValueKey(_selectedIncidentId), 
                     incidentId: _selectedIncidentId!,
@@ -238,8 +242,9 @@ class _IncidentDetailsState extends State<IncidentDetails> {
                   style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w900, color: Colors.red)),
               Text("Location: Room ${data['location']}", style: const TextStyle(fontSize: 24)),
               const Divider(height: 60),
-              const Text("ASSIGN STAFF", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
+              const Text("AVAILABLE STAFF", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
               const SizedBox(height: 20),
+              // Horizontal list of online staff
               SizedBox(
                 height: 120,
                 child: StreamBuilder<QuerySnapshot>(
@@ -247,6 +252,8 @@ class _IncidentDetailsState extends State<IncidentDetails> {
                   builder: (context, staffSnapshot) {
                     if (!staffSnapshot.hasData) return const LinearProgressIndicator();
                     final staffDocs = staffSnapshot.data!.docs;
+                    if (staffDocs.isEmpty) return const Text("No staff currently online.");
+
                     return ListView.builder(
                       scrollDirection: Axis.horizontal,
                       itemCount: staffDocs.length,
@@ -259,7 +266,7 @@ class _IncidentDetailsState extends State<IncidentDetails> {
                           child: Container(
                             width: 150, margin: const EdgeInsets.only(right: 15),
                             decoration: BoxDecoration(
-                              color: isSelected ? Colors.blue.withValues(alpha: 0.2) : Colors.white10,
+                              color: isSelected ? Colors.blue.withValues(alpha : 0.2) : Colors.white10,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: isSelected ? Colors.blue : Colors.transparent, width: 2),
                             ),
@@ -308,6 +315,7 @@ class _IncidentDetailsState extends State<IncidentDetails> {
       'assignedStaff': _selectedStaffName,
       'assignedStaffId': _selectedStaffId,
     });
+    // Set staff member to busy
     await FirebaseFirestore.instance.collection('Staff').doc(_selectedStaffId).update({'isAvailable': false});
   }
 
@@ -316,6 +324,7 @@ class _IncidentDetailsState extends State<IncidentDetails> {
     if (status == "Resolved") {
       updateData['assignedStaff'] = FieldValue.delete();
       updateData['assignedStaffId'] = FieldValue.delete();
+      // Free up the staff member again
       if (staffId != null) {
         await FirebaseFirestore.instance.collection('Staff').doc(staffId).update({'isAvailable': true});
       }
@@ -337,12 +346,24 @@ class StaffResponderView extends StatelessWidget {
         title: const Text("RESPONDER TERMINAL"),
         actions: [
           IconButton(icon: const Icon(Icons.logout), onPressed: () async {
+            // Person 3's Logic: Set unavailable when logging out
             await FirebaseFirestore.instance.collection('Staff').doc(uid).update({'isAvailable': false});
             await FirebaseAuth.instance.signOut();
           }),
         ],
       ),
-      body: const Center(child: Text("Waiting for incoming alerts...")),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.radar, size: 80, color: Colors.greenAccent),
+            const SizedBox(height: 20),
+            const Text("Online & Waiting for Alerts...", style: TextStyle(fontSize: 20)),
+            const SizedBox(height: 10),
+            Text("User ID: $uid", style: const TextStyle(color: Colors.grey)),
+          ],
+        ),
+      ),
     );
   }
 }
