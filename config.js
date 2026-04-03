@@ -54,3 +54,15 @@ export function initMessaging() {
     if (token) console.log("Push token: " + token);
   });
 }
+export async function updateStaffAvailability(staffId, isAvailable) {
+  try {
+    const staffRef = doc(db, "staff", staffId);
+    await updateDoc(staffRef, {
+      available: isAvailable,
+      lastUpdated: serverTimestamp()
+    });
+    console.log("Staff status updated!");
+  } catch (err) {
+    console.log("Staff update error: " + err);
+  }
+}
