@@ -58,7 +58,7 @@ export async function updateStaffAvailability(staffId, isAvailable) {
   try {
     const staffRef = doc(db, "staff", staffId);
     await updateDoc(staffRef, {
-      available: isAvailable,
+      isAvailable: isAvailable,
       lastUpdated: serverTimestamp()
     });
     console.log("Staff status updated!");
